@@ -1,7 +1,7 @@
 ---
 title: "Homework 2"
-author: "Your Name"
-date: "2025-XX-XX"
+author: "Megan Liu"
+date: "2026-05-26"
 params:
   number: 2
   purpose: "The purpose of this assignment is to practice the visual channels and design principles we covered in class and let you get hands-on experience of working with real-world data."
@@ -9,7 +9,7 @@ format:
   html:
     toc: true
     toc-location: right
-    theme: flatly
+    theme: sandstone
     self-contained: true
 execute:
   echo: true
@@ -78,9 +78,9 @@ Following these steps to download and read in the dataset:
 
 4. Read in the CSV file using `read_csv()`
 
-```{r, eval=FALSE}
+```{r}
 # remove the eval=FALSE when you render quarto document
-df_disasters <- read_csv("data/events-US-1980-2024-Q4.csv", skip = 2) |>
+df_disasters <- read_csv("/Users/meganliu/Documents/MPH/Summer 2026/PH 6199/Homeworks/Homework 2/2026-hw2-meganyliu/data:/events-US-1980-2024-Q4.csv", skip = 2) |>
   janitor::clean_names()
 # the skip argument is used to skip the first two rows of the CSV file, which contain metadata about the dataset.
 ```
@@ -95,7 +95,7 @@ df_disasters <- read_csv("data/events-US-1980-2024-Q4.csv", skip = 2) |>
 
 6. Create a new column `year` that extracts the year from the `begin_date` column. You can use the `lubridate` package to do this.
 
-```{r, eval=FALSE}
+```{r}
 # remove the eval=FALSE when you render quarto document
 df_disasters <- df_disasters |>
   mutate(year = lubridate::year(ymd(begin_date)))
@@ -108,13 +108,31 @@ df_disasters <- df_disasters |>
 - Calculate the total CPI-adjusted cost of disasters per year. Identify the top 3 most expensive years.
 
 ```{r}
-#your code here
+glimpse(df_disasters)
+summary(df_disasters)
+
+df_disasters %>% 
+  group_by(disaster) %>% 
+  summarise(count = n()) %>% # summarize the number of disasters
+  ggplot(aes(x = fct_reorder(disaster, -count), y = count)) + # reorder in descending order for easy visualization
+  geom_col() + # Create bar graph using geom_col()
+  geom_text(aes(label = count, vjust = -0.5)) +
+  scale_y_continuous(limits = c(0, 225)) + # increase y-axis limits so that bar count labels are visible
+  labs(title = "US Disaster Types, 1980-2024", x = "Disaster Type", y = "Count") +
+  theme_minimal()  
+
+df_disasters %>% # find most expensive disasters by year, by grouping by year 
+  group_by(year) %>% 
+  summarize(total_cpicost = sum(cpi_adjusted_cost, na.rm = TRUE)) %>% # then add up costs by year
+  arrange(desc(total_cpicost)) # and display in descending order to answer the question
+
+sum(df_disasters$cpi_adjusted_cost) # Checked the total sum of costs; above says the unit is billions of dollars, but total comes out to 2916862, so should be in millions as $2,916,862 million would equate to $2.9 trillion, which is how much the NOAA dataset overview webpage states that the disaster costs amounted to between 1980 to 2024.
 ```
 
 ::: {.callout-note title="Your Answer"}
-- Missing data:
-- 5 most disaster types:
-- 3 most expensive years by CPI-adjusted cost:
+- Missing data: There doesn't appear to be missing values, but there are zero values in the cost or deaths columns. This may result in making it look like some disasters didn't result in any costs or deaths, even though this most likely means that data wasn't available or collected. This may result in data visualizations (e.g. a line graph) where year is on the x-axis and deaths or costs on the y-axis having trends close to 0, making it hard to understand the true relationship between disaster types and outcomes like deaths or disaster costs; or, having more variation in the data/trend than one may expect.
+- 5 most disaster types: The 5 most common disaster types were (1) Severe Storm, which occurred 203 times between 1980 to 2024; (2) Tropical Cyclone, which occurred 67 times between 1980 to 2024; (3) Flooding, which occurred 45 times; (4) Drought, which occurred 32 times; and (5) Winter Storm, which occurred 24 times.
+- 3 most expensive years by CPI-adjusted cost: The 3 most expensive years by CPI-adjusted cost were (1) 2017, at $395,936.20 million; (2) 2005, at $268,593.30 million; and (3) 2022, at $188,352.90 million.
 :::
 
 
@@ -138,13 +156,41 @@ Your final visualization should:
 - Include at least one theme adjustments (e.g., axis labels, legend position, font size) to improve readability/visual appeal
 
 ```{r}
-#your code here
+
+# Goal is to present a table that shows trends in annual disaster costs per year in billions of dollars. To do so, will need to summarize total cpi_adjusted_cost by year, and adjust the cpi_adjusted_cost column to show values in billions, not millions (as it currently is).
+
+df_disasters2 <- df_disasters %>% # Create new dataframe in order to graph annual disaster costs
+  select(disaster, year, cpi_adjusted_cost) %>% # Select for the 3 relevant columns
+  mutate(cpi_adjusted_cost_mil = (cpi_adjusted_cost/1000)) # Add new column where cost unit updated to billions
+
+sum(df_disasters2$cpi_adjusted_cost_mil) # Check that values add up to $2.9 trillion
+
+df_disasters2 %>% 
+  ggplot(aes(x = year, y = cpi_adjusted_cost_mil, group = disaster, color = disaster)) +
+  geom_line() + # Show data using a line graph
+  labs(title = "Annual US Disaster Costs, 1980-2024", x = "Year", y = "Cost in Billions of Dollars", 
+       subtitle = "Costs of US disasters between 1980 to 2024 amounted to $2.9 trillion", 
+       caption = "Data: NOAA Billion-Dollar Disasters\n(accessed June 2026)") + # Displayed caption on two lines, since otherwise its placement was crowding the x-axis title
+  facet_wrap(~ disaster) + # Faceted/distinguished by disasters, so that graph would be easier to read
+  scale_color_manual(values = c( # Experimented with different colors (looked up a ggplot color chart online)
+    "Drought" = "sienna4",
+    "Flooding" = "dodgerblue4",
+    "Freeze" = "darkorchid3",
+    "Severe Storm" = "mediumvioletred",
+    "Tropical Cyclone" = "springgreen4", 
+    "Wildfire" = "orange2",
+    "Winter Storm" = "steelblue2")) +
+  theme_minimal() +
+  theme(legend.position = "none") # Deleted legend, since facet_wrap() already separates and distinguishes the disaster types
+
 ```
 
 What do you notice about the trends over time in the frequency and/or cost of disasters? Anything unexpected?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+I chose to visualize trends in cost of disasters between 1980 to 2024, by using line graphs and faceting by disasters so that each trend was easier to interpret. Over time, it appears that most of the seven disaster types (drought, flooding, freeze, severe storm, wildfire, and winter storm) tend to range up to around $25 billion to $50 billion. While these seven can range up to these amounts, most appear to amount to costs on the lower side, closer to 0 (although lower doesn't necessarily mean inexpensive, considering the units are in billions of dollars). Tropical cyclones on the other hand appear to be the most costly disaster type, with costs peaking up to $200 billion around 2005, with additional peaks between 2010 to 2024. It appears that there have been more costly damages from tropical cyclones between around 2005 up to 2024, compared to years prior to 2005. The costs of freeze and severe storm events both seem similarly stagnant, while drought, wildfire, and winter storm events are also stagnant but both exhibit peaks in data indicating rare occurrences of perhaps more damaging and costly disasters. For both wildfires and winter storms, their highest costs both appear to have occurred more recently, around 2020, which may indicate that some of these disaster impacts may be getting worse over time.
+
+In terms of anything unexpected, I had hypothesized that flooding costs would be high, and possibly peaking around Hurricane Katrina in 2005, or Hurricane Sandy in 2012, but based on the trends seen in the tropical cyclone graph, I'm guessing floods from hurricanes were lumped in to the tropical cyclone cost impacts, since perhaps NOAA attributes all costs and damages with the primary disaster event. I also expected that wildfire costs may be higher, given the increase in wildfire events over time, and was surprised to only see a few peaks around 2020.
 :::
 
 ## Q3: Reflection
@@ -152,26 +198,28 @@ Type your response here.
 a. What are your variables of interest and what kinds of data (e.g., numeric, categorical, ordered, etc.) are they?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+My variables of interest in this visualization were disaster types (nominal categorical data), CPI-adjusted-costs (continuous numerical), and year (discrete numerical). 
 :::
 
 b. How did you decide which type of graphic form was best suited for answering the question?
 What alternative graphic forms could you have used instead? Why did you settle on this particular form?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+I chose to use a line graph in order to show trends in disaster costs over time. I thought this would be the best visualization to see how costs have changed over time. The first graph I made lumped all the disaster types onto one graph, which made visualization difficult, so I ultimately decided to facet wrap the graph by disaster types for better visualization.
+
+I had also considered using a stacked area chart, since I thought it could be interesting to see and compare the proportions of how much each disaster type cost the US. I had given this a try, but this  felt more difficult to interpret. 
 :::
 
 c. What modifications did you make to this viz to improve readability and accessibility?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+For this visualization, I made sure to include a succinct but descriptive title, axis labels, a subtitle, and caption. I had initially played around with moving the caption placement using theme(plot.caption = element_text(hjust = x)), since it was initially placed directly under the x-axis label, but ultimately didn't need to do this after deleting the legend, which resulted in the caption defaulting to a more clean placement on the graph. I deleted the legend, since it felt redundant to have given that I chose to facet wrap the graph by each disaster type, where each graph had a title for their respective disaster type. I also chose different colors for each disaster type to experiment with options other than the ggplot default, by using the scale_color_manual() function.
 :::
 
 d. Is there anything you wanted to implement but didn’t know how? If so, describe it.
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+One particular element I wanted to explore but didn't know how to was whether there was a way to stretch out the x-axis. For example, some of the peaks in the tropical cyclone graph can be hard to read, and when I had initially created just the one graph with all the trend lines, the compressed dimensions made it look like some of the data peaks were obscuring other falls and rises in the data. I was wondering if stretching out the x-axis or maybe changing the dimensions of the graph would help for better visualization here.
 :::
 
 ## Q4: Critique the original graph from NOAA
@@ -187,7 +235,9 @@ a. Describe the graphic
 - What is the intended takeaway?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+- This graph uses bar charts (specifically a stacked bar chart) to show the frequency of disaster events over time, as well as line plots to show trends in disaster costs over time. 
+- The variables encoded include: (1) disaster types, which are mapped by color; (2) disaster frequency, which are mapped by their disaster type color, as well as by the stacked bar chart proportions; (3) disaster costs, which are mapped by the line plots, and differentiated by color based on the monetary trend being evaluated (e.g., combined disaster cost (and their 95% confidence intervals), and 5-year average costs). 
+- By showing both the stacked bar chart and line plots, it seems that NOAA is trying to get readers to understand how frequencies of different disasters have changed over time, how they compare to each other, and what disasters frequently occur each year. This graph also is trying to get readers to understand how disaster costs have changed over time, and by mapping the disaster costs as line plots over disaster types and frequences as stacked bar charts over time, they're also trying to get readers to see that costs appear to have a relationship with disaster frequency over time.
 :::
 
 b. Assess strengths
@@ -196,7 +246,9 @@ b. Assess strengths
 - Is there anything done particularly well in terms of accessibility, color use, or labeling?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+The aspects of the chart that help communicate the intended message clearly is title, which immediately tells readers that we're looking at the types of disaster events, and their costs. The placement of the legend directly under the title as the next thing readers direct their eyes to is also helpful for readers to understand that we're looking at both disaster types and disaster costs. I think overlaying the line plots over the stacked bar chart also makes it clear that this graph is trying to convey how costs and disaster occurrence are related. 
+
+The labeling feels particularly well done, as it feels like an efficient use of ink space where this graph is able to show a lot of data all on one graph. I feel like the authors could have easily chosen to show two different graphs, with disaster frequency on one, and disaster costs on another, but by utilizing both the left and right y-axes, this graph was able to do both in one.
 :::
 
 c. Assess limitations
@@ -206,7 +258,7 @@ c. Assess limitations
 - Does the chart overcomplicate the message or try to show too much?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+While I think this graph effectively conveys a lot of data at once, it is a really busy graph, with both the stacked bar charts with various colors and the different line plots overlaid on top. It took me a while to interpret each component of the graph, first trying to understand what the stacked bar charts were showing, then looking at the proportions of disaster frequencies in each bar, then finally directing my eyes towards the three line plot elements and trying to understand the trends, before finally examining whether there was any association between costs and disaster types over time. I think the colors of the line plots are also a bit hard to see, given how bright the colors of the stacked bar chart are. I think this chart overcomplicates the message a bit, as there are a bunch of different relationships within this graph that could be examined one by one, but it is able to communicate a lot of things on one graph which also has its benefits.
 :::
 
 d. Recommend improvements
@@ -215,7 +267,9 @@ d. Recommend improvements
 - Would you consider separating out the lines from the stacked bars? Using interactivity? Changing the layout?
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+1. If we're assuming that all this data needs to be shown on this single chart, and that this graph is intended for general audiences, I would take off the 95% confidence intervals for cost. I feel like this wastes ink, and general audiences who don't have a statistical or research/public health background may not take much meaning away from the 95% CIs. 
+2. I would also consider taking off the 5-year average costs, since this doesn't feel like it has a very clear takeaway relative to the other information on the graph. 
+3. As a result of the recommendations above, I'd choose to only display the combined disaster cost line plot, and also choose a more distinguishable color so that it stands out more on top of the stacked bar charts. I would also change the saturation of the stacked bar charts, in order to make the line plot more visible.
 :::
 
 
@@ -236,7 +290,7 @@ Type your reflection here.
 Describe how GenAI is used in producing this homework, include prompt, date, model version, and link to chat history.
 
 ::: {.callout-note title="Your Answer"}
-Type your response here.
+I avoided using GenAI for this assignment.
 :::
 
 ## Save and Push Your Work
